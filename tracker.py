@@ -1,5 +1,6 @@
 import cv2
 import time
+import csv
 
 # Toplam mesafeyi 28,5 santimetre olarak kabul ediyoruz
 total_distance_meters = 0.285
@@ -22,69 +23,81 @@ bbox = cv2.selectROI("Tracking", frame, False)
 tracker = cv2.TrackerCSRT_create()
 tracker.init(frame, bbox)
 
-# Zaman ve konum değişkenlerini başlat
-start_time = time.time()
-prev_bbox = bbox
-no_movement_start_time = None
-path_points = []
+# CSV dosyasını oluştur
+with open('tracking_coordinates.csv', 'w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['Frame', 'X', 'Y', 'Time'])
+    frame_count = 0
 
-# Son geçerli kareyi saklamak için değişken
-last_valid_frame = None
+    # Zaman ve konum değişkenlerini başlat
+    start_time = time.time()
+    prev_bbox = bbox
+    no_movement_start_time = None
+    path_points = []
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+    # Son geçerli kareyi saklamak için değişken
+    last_valid_frame = None
 
-    # Yeni karede nesneyi izle
-    success, bbox = tracker.update(frame)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    if success:
-        # Son geçerli kareyi güncelle
-        last_valid_frame = frame.copy()
+        # Yeni karede nesneyi izle
+        success, bbox = tracker.update(frame)
 
-        # İzlenen nesnenin merkez noktasını hesapla ve listeye ekle
-        center = (int(bbox[0] + bbox[2] / 2), int(bbox[1] + bbox[3] / 2))
-        path_points.append(center)
+        if success:
+            # Son geçerli kareyi güncelle
+            last_valid_frame = frame.copy()
 
-        # İzlenen nesneyi çiz
-        p1 = (int(bbox[0]), int(bbox[1]))
-        p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-        cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
+            # İzlenen nesnenin merkez noktasını hesapla ve listeye ekle
+            center = (int(bbox[0] + bbox[2] / 2), int(bbox[1] + bbox[3] / 2))
+            path_points.append(center)
 
-        # Hareket kontrolü
-        if (int(bbox[0]) == int(prev_bbox[0]) and int(bbox[1]) == int(prev_bbox[1])):  # Hareket etmediği kabul edilen durum
-            if no_movement_start_time is None:
-                no_movement_start_time = time.time()
-            elif time.time() - no_movement_start_time > 2:
-                print("Nesne 2 saniye boyunca aynı konumda kaldı, videoyu bitiriyorum.")
-                break
+            # Koordinatları CSV'ye yaz
+            current_time = time.time() - start_time
+            writer.writerow([frame_count, center[0], center[1], current_time])
+
+            # İzlenen nesneyi çiz
+            p1 = (int(bbox[0]), int(bbox[1]))
+            p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
+            cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
+
+            # Hareket kontrolü
+            if (int(bbox[0]) == int(prev_bbox[0]) and int(bbox[1]) == int(
+                    prev_bbox[1])):  # Hareket etmediği kabul edilen durum
+                if no_movement_start_time is None:
+                    no_movement_start_time = time.time()
+                elif time.time() - no_movement_start_time > 2:
+                    print("Nesne 2 saniye boyunca aynı konumda kaldı, videoyu bitiriyorum.")
+                    break
+            else:
+                no_movement_start_time = None
+
+            # Zaman ve konum güncelleme
+            prev_bbox = bbox
         else:
-            no_movement_start_time = None
+            cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            print("Tracking failure detected, videoyu bitiriyorum.")
+            break
 
-        # Zaman ve konum güncelleme
-        prev_bbox = bbox
+        # Path noktasını çiz
+        for point in path_points:
+            cv2.circle(frame, point, 2, (0, 255, 0), -1)
+
+        cv2.imshow('Tracking', frame)
+        frame_count += 1
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Son geçerli kareyi kaydet
+    if last_valid_frame is not None:
+        for point in path_points:
+            cv2.circle(last_valid_frame, point, 2, (0, 255, 0), -1)
+        cv2.imwrite("tracked_path_last_frame.jpg", last_valid_frame)
     else:
-        cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-        print("Tracking failure detected, videoyu bitiriyorum.")
-        break
-
-    # Path noktasını çiz
-    for point in path_points:
-        cv2.circle(frame, point, 2, (0, 255, 0), -1)
-
-    cv2.imshow('Tracking', frame)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Son geçerli kareyi kaydet
-if last_valid_frame is not None:
-    for point in path_points:
-        cv2.circle(last_valid_frame, point, 2, (0, 255, 0), -1)
-    cv2.imwrite("tracked_path_last_frame.jpg", last_valid_frame)
-else:
-    print("Son geçerli kare bulunamadı, resim kaydedilemedi.")
+        print("Son geçerli kare bulunamadı, resim kaydedilemedi.")
 
 cap.release()
 cv2.destroyAllWindows()
