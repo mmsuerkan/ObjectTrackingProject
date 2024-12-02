@@ -7,7 +7,7 @@ total_distance_meters = 0.285
 # Video dosyasını veya kamera kaynağını aç
 cap = cv2.VideoCapture("output.mp4")  # '0' yerine video dosyası yolu da kullanılabilir
 
-# İlk kareyi oku
+# İlk kareyi oku test
 ret, frame = cap.read()
 if not ret:
     print("Kamera açılamadı veya video dosyası bulunamadı")
