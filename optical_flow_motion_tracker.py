@@ -64,6 +64,12 @@ plt.title('Motion Vectors')
 plt.savefig('vector_visualization.png')
 plt.close()
 
+
+# Ortalama hareket büyüklüğünü hesapla
+magnitudes = np.sqrt(vector_data[:, 2]**2 + vector_data[:, 3]**2)
+mean_magnitude = np.mean(magnitudes)
+print(f"Ortalama Hareket Yoğunluğu: {mean_magnitude:.4f}")
+
 # Vektör verilerini CSV'ye kaydet
 with open('vector_data.csv', 'w', newline='') as file:
     writer = csv.writer(file)
